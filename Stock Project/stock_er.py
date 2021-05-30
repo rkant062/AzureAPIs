@@ -29,15 +29,15 @@ class Stocker(Logger):
 
     def _initialize_portfolio(self, data):
         self.portfolio_ = pd.DataFrame()
-        self.portfolio_ = pd.DataFrame({'Stock' : [data.loc[0, 'Stock']], 'Transaction Amount' : [data.loc[0, 'Cost Price']], 'Remaining Units' : [data.loc[0, 'Units']]})
-        #print(self.portfolio_)
+        self.portfolio_ = pd.DataFrame({'Stock' : [data.loc[0, 'Stock']], 'Transaction Amount' : [data.loc[0, 'Cost Price']], 'Remaining Units' : [data.loc[0, 'Units']], 'Average': [data.loc[0, 'Price']]})
         for i in range(1, len(data)):
-            #print(data.loc[i, 'Stock'] not in self.portfolio_.values)
             if(data.loc[i, 'Stock'] not in self.portfolio_.values):
                 self.log("{} New Stock added to portfolio, Creating new entry in hash".format(data.loc[i, 'Stock']))
-                self.portfolio_.loc[len(self.portfolio_.index)] = [data.loc[i, 'Stock'], data.loc[i, 'Cost Price'], data.loc[i, 'Units']]
+                self.portfolio_.loc[len(self.portfolio_.index)] = [data.loc[i, 'Stock'], data.loc[i, 'Cost Price'], data.loc[i, 'Units'], data.loc[i, 'Price']]
             else:
                 if(data.loc[i, 'Transaction']=='B'):
+                    self.portfolio_.loc[self.portfolio_['Stock'] == data.loc[i, 'Stock'], 'Average'] += data.loc[i, 'Price']
+                    self.portfolio_.loc[self.portfolio_['Stock'] == data.loc[i, 'Stock'], 'Average'] /= 2
                     self.portfolio_.loc[self.portfolio_['Stock'] == data.loc[i, 'Stock'], 'Transaction Amount'] += data.loc[i, 'Cost Price']
                     self.portfolio_.loc[self.portfolio_['Stock'] == data.loc[i, 'Stock'], 'Remaining Units'] = self.portfolio_.loc[self.portfolio_['Stock'] == data.loc[i, 'Stock'], 'Transaction Amount'] / self._get_market_price(data.loc[i, 'Stock']) * 1.0;
                     self.log("BUY: Total amount invested YTD in {} is {}".format(data.loc[i, 'Stock'], self.portfolio_.loc[self.portfolio_["Stock"]==data.loc[i, 'Stock'], "Transaction Amount"].iloc[0]))
@@ -58,7 +58,7 @@ class Stocker(Logger):
         self.log("{} Collating sell and buy transactions".format(datetime.datetime.utcnow()));
         self._initialize_portfolio(self.local_demographic_)
 
-    def reduce_profits(self):
+    def deduce_profits(self):
         sum = 0
         for i in range(0, len(self.portfolio_)):
             sum += self.portfolio_.loc[i, 'Transaction Amount']
@@ -76,7 +76,7 @@ class Stocker(Logger):
             self.local_demographic_.loc[i, 'Profits/Loss ETD'] = self.local_demographic_.loc[i,'CMP'] * self.local_demographic_.loc[i,'Units'] - self.local_demographic_.loc[i,'Cost Price']
             self.local_demographic_.loc[i, 'Percentage Change'] = str(self.local_demographic_.loc[i, 'Profits/Loss ETD'] / self.local_demographic_.loc[i,'Cost Price'] * 100) + str(' %')
         self._collate_buy_and_sell_transactions()
-        self.reduce_profits()
+        self.deduce_profits()
         return self.local_demographic_
 
     def __init__(self, data):
