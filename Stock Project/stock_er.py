@@ -6,6 +6,7 @@ import threading
 import time
 import datetime
 from pathlib import Path
+import sys
 
 
 class Logger(object):
@@ -16,7 +17,7 @@ class Logger(object):
         self.logFile.seek(0, 2)
 
     def log(self, stringToLog):
-        print(stringToLog+"\n\n")
+        #print(stringToLog+"\n\n")
         self.logFile.write(stringToLog)
 
    # def __del__(self):
@@ -70,13 +71,23 @@ class Stocker(Logger):
 
     def get_stock_demographics(self, file_input_df):
         self.local_demographic_ = file_input_df
-        for i in range(0, len(file_input_df['Stock']), 1):
+        progress = 0.0
+        self.update_progress(progress)
+        for i in range(0, len(file_input_df['Stock']), 1): 
+            progress = progress+(0.25/len(file_input_df))
+            self.update_progress(progress)   
             self.local_demographic_.loc[i, 'CMP'] = self._get_market_price(self.local_demographic_.loc[i,'Stock'])
             self.local_demographic_.loc[i, 'Cost Price'] = self.local_demographic_.loc[i,'Price'] * self.local_demographic_.loc[i,'Units']
             self.local_demographic_.loc[i, 'Profits/Loss ETD'] = self.local_demographic_.loc[i,'CMP'] * self.local_demographic_.loc[i,'Units'] - self.local_demographic_.loc[i,'Cost Price']
             self.local_demographic_.loc[i, 'Percentage Change'] = str(self.local_demographic_.loc[i, 'Profits/Loss ETD'] / self.local_demographic_.loc[i,'Cost Price'] * 100) + str(' %')
+            progress = progress+(0.25/len(file_input_df))
+            self.update_progress(progress) 
         self._collate_buy_and_sell_transactions()
+        progress = progress+(0.3)
+        self.update_progress(progress)
         self.deduce_profits()
+        progress = progress+(0.3)
+        self.update_progress(progress)
         return self.local_demographic_
 
     def __init__(self, data):
@@ -84,12 +95,31 @@ class Stocker(Logger):
 
     def __del__(self):
         print(self.portfolio_)
+
+    def update_progress(self, progress):
+        barLength = 50 # Modify this to change the length of the progress bar
+        status = ""
+        if isinstance(progress, int):
+            progress = float(progress)
+        if not isinstance(progress, float):
+            progress = 0
+            status = "error: progress var must be float\r\n"
+        if progress < 0:
+            progress = 0
+            status = "Halt...\r\n"
+        if progress >= 1:
+            progress = 1
+            status = "Done...\r\n"
+        block = int(round(barLength*progress))
+        text = "\r Computing Progress: [{0}] {1}% {2}".format( "#"*block + " "*(barLength-block), int(progress*100), status)
+        sys.stdout.write(text)
+        sys.stdout.flush()
     
 
 class FileHandler(Logger):
 
-    def __init__(self):
-        Logger.__init__(self, fileName='file_'+str(time.time()))
+    # def __init__(self):
+    #     Logger.__init__(self, fileName='file_'+str(time.time()))
 
     def read_user_file(self, file_path):
         self.log("{} : Reading file {} at {}".format(datetime.datetime.utcnow(), file_path, threading.currentThread().getName))
@@ -104,11 +134,18 @@ class FileHandler(Logger):
 class Marketeer():
     def main():
         file_handler = FileHandler()
+        #self.update_progress(0.1)
         data = file_handler.read_user_file('stock_err.csv')
+        #update_progress(0.2)
         stocker = Stocker(data)
+        #update_progress(0.2)
         _local_demographics_ = stocker.get_stock_demographics(data)
+        #update_progress(0.4)
         file_handler.write_user_file(_local_demographics_)
+        #update_progress(0.1)
         print(_local_demographics_)
+
+ 
         
     if __name__ == "__main__":
         main()
